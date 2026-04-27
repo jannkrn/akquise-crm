@@ -46,7 +46,10 @@ OPENAI_MODEL=gpt-4o-mini
 
 ```powershell
 streamlit run app.py
+
 ```
+Dann im Browser 
+http://localhost:8501
 
 Beim ersten Start wird die SQLite-Datenbank automatisch angelegt. Falls die Datei noch nicht existiert, entsteht sie unter `data/akquise.db`.
 
