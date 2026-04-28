@@ -224,7 +224,7 @@ def create_gmail_draft_stub(*_args: Any, **_kwargs: Any) -> dict[str, str | bool
     return {
         "implemented": False,
         "message": (
-            "Gmail-Drafts sind in dieser Version nur als Stub vorgesehen. "
+            "Gmail-Drafts können über gmail_service.py erstellt werden. "
             "Es gibt bewusst keinen Gmail-Send-Call."
         ),
     }

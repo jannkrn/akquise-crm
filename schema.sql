@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS companies (
     email_subject TEXT,
     email_body TEXT,
     email_variant TEXT,
+    gmail_draft_id TEXT,
     status TEXT DEFAULT 'Recherchiert',
     first_contact_date TEXT,
     follow_up_date TEXT,

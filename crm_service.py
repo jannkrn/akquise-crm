@@ -51,6 +51,7 @@ COMPANY_FIELDS = [
     "email_subject",
     "email_body",
     "email_variant",
+    "gmail_draft_id",
     "status",
     "first_contact_date",
     "follow_up_date",

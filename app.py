@@ -31,10 +31,10 @@ from crm_service import (
 )
 from db import init_db
 from email_generator import (
-    create_gmail_draft_stub,
     generate_follow_up_email,
     generate_initial_email,
 )
+from gmail_service import GmailDraftError, create_gmail_draft, gmail_status
 
 
 DISPLAY_COLUMNS = [
@@ -46,6 +46,7 @@ DISPLAY_COLUMNS = [
     "company_type",
     "relevant_topics",
     "offer_angle",
+    "gmail_draft_id",
     "status",
     "follow_up_date",
     "response_type",
@@ -164,6 +165,14 @@ def render_company_form(company: dict[str, Any] | None = None) -> None:
         email_body = st.text_area("E-Mail-Text", value=defaults["email_body"], height=180)
         next_step = st.text_input("Nächster Schritt", value=defaults["next_step"])
         notes = st.text_area("Notizen", value=defaults["notes"], height=100)
+        prepare_gmail_draft = st.checkbox(
+            "Nach dem Speichern Gmail-Entwurf vorbereiten",
+            value=False,
+            help=(
+                "Erzeugt nur den Mailtext und merkt das Unternehmen für den Tab Mail-Entwürfe vor. "
+                "Der Gmail-Draft wird erst nach sichtbarer Prüfung per Button erstellt."
+            ),
+        )
 
         submitted = st.form_submit_button("Speichern")
 
@@ -195,10 +204,29 @@ def render_company_form(company: dict[str, Any] | None = None) -> None:
         try:
             if is_edit:
                 update_company(int(company["id"]), payload, require_name=True)
-                st.success("Unternehmen aktualisiert.")
+                saved_id = int(company["id"])
+                message = "Unternehmen aktualisiert."
             else:
-                create_company(payload)
-                st.success("Unternehmen angelegt.")
+                saved_id = create_company(payload)
+                message = "Unternehmen angelegt."
+
+            if prepare_gmail_draft:
+                saved_company = get_company(saved_id) or payload
+                draft = generate_initial_email(saved_company, tone="sachlich", use_openai=False)
+                update_company(
+                    saved_id,
+                    {
+                        "email_subject": draft["subject"],
+                        "email_body": draft["body"],
+                        "email_variant": draft["variant"],
+                        "status": "Entwurf erstellt",
+                    },
+                )
+                st.session_state[f"draft_{saved_id}"] = draft
+                st.session_state["draft_company_id"] = saved_id
+                message += " Mail-Entwurf wurde vorbereitet und ist im Tab Mail-Entwürfe vorausgewählt."
+
+            st.session_state["flash_success"] = message
             st.rerun()
         except ValueError as exc:
             st.error(str(exc))
@@ -275,7 +303,16 @@ def render_email_drafts() -> None:
         st.info("Lege zuerst ein Unternehmen an.")
         return
 
-    selected_label = st.selectbox("Unternehmen", list(options.keys()), key="draft_company")
+    labels = list(options.keys())
+    requested_id = st.session_state.get("draft_company_id")
+    default_index = 0
+    if requested_id:
+        for index, label in enumerate(labels):
+            if options[label] == requested_id:
+                default_index = index
+                break
+
+    selected_label = st.selectbox("Unternehmen", labels, index=default_index, key="draft_company")
     selected_id = options[selected_label]
     company = get_company(selected_id) or {}
 
@@ -336,7 +373,7 @@ def render_email_drafts() -> None:
     body = st.text_area("E-Mail-Text", value=draft.get("body", ""), height=320, key=f"body_{selected_id}")
     variant = st.text_input("Variante", value=draft.get("variant", ""), key=f"variant_{selected_id}")
 
-    col1, col2 = st.columns([1, 2])
+    col1, col2 = st.columns([1, 1])
     if col1.button("Entwurf beim Unternehmen speichern"):
         update_company(
             selected_id,
@@ -352,8 +389,40 @@ def render_email_drafts() -> None:
         st.rerun()
 
     with col2:
-        stub = create_gmail_draft_stub()
-        st.caption(stub["message"])
+        gmail_config = gmail_status()
+        has_recipient = bool(str(company.get("email") or "").strip())
+        can_create_draft = bool(subject.strip() and body.strip() and has_recipient)
+
+        if st.button("Gmail-Draft erstellen", disabled=not can_create_draft):
+            try:
+                draft_id = create_gmail_draft(
+                    to=str(company.get("email") or ""),
+                    subject=subject,
+                    body=body,
+                )
+                update_company(
+                    selected_id,
+                    {
+                        "email_subject": subject,
+                        "email_body": body,
+                        "email_variant": variant,
+                        "gmail_draft_id": draft_id,
+                        "status": "Entwurf erstellt",
+                    },
+                )
+                st.session_state["flash_success"] = f"Gmail-Draft erstellt. Draft-ID: {draft_id}"
+                st.rerun()
+            except GmailDraftError as exc:
+                st.error(str(exc))
+
+        if company.get("gmail_draft_id"):
+            st.caption(f"Gmail-Draft-ID: {company['gmail_draft_id']}")
+        elif not gmail_config["credentials_exists"]:
+            st.caption("Gmail ist noch nicht konfiguriert. Lege credentials.json im Projektordner ab.")
+        elif not has_recipient:
+            st.caption("Für Gmail-Drafts braucht das Unternehmen eine E-Mail-Adresse.")
+        else:
+            st.caption("Gmail-Drafts nutzen nur den Scope gmail.compose. Es gibt keinen Send-Call.")
 
 
 def render_followups() -> None:
@@ -522,13 +591,18 @@ def render_settings() -> None:
     st.write(f"Datenbank: `{DB_PATH}`")
     st.write(f"Exports: `{EXPORTS_DIR}`")
     st.write("OpenAI API-Key:", "konfiguriert" if OPENAI_API_KEY else "nicht konfiguriert")
+    gmail_config = gmail_status()
+    st.write("Gmail OAuth-Datei:", "gefunden" if gmail_config["credentials_exists"] else "nicht gefunden")
+    st.write(f"Gmail Credentials: `{gmail_config['credentials_path']}`")
+    st.write(f"Gmail Token: `{gmail_config['token_path']}`")
+    st.write(f"Gmail Scope: `{gmail_config['scope']}`")
 
     st.subheader("Sicherheit")
     st.info(
         "Diese App versendet keine E-Mails automatisch. Mailtexte werden lokal gespeichert und müssen manuell geprüft werden."
     )
     st.write(
-        "Eine spätere Gmail-Draft-Funktion ist als getrennter Stub vorbereitet. Ein Send-Call ist bewusst nicht implementiert."
+        "Gmail-Drafts werden ausschließlich über gmail.compose erstellt. Ein Gmail-Send-Call ist bewusst nicht implementiert."
     )
 
 
@@ -536,6 +610,8 @@ def main() -> None:
     setup()
     st.title("Akquise-CRM für Immobilienunternehmen")
     st.caption("Lokale Verwaltung von Leads, Mailentwürfen und Follow-ups.")
+    if st.session_state.get("flash_success"):
+        st.success(st.session_state.pop("flash_success"))
 
     tabs = st.tabs(
         [

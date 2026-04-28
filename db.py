@@ -22,7 +22,17 @@ def init_db() -> None:
     schema = Path(SCHEMA_PATH).read_text(encoding="utf-8")
     with get_connection() as conn:
         conn.executescript(schema)
+        _run_migrations(conn)
         conn.commit()
+
+
+def _run_migrations(conn: sqlite3.Connection) -> None:
+    columns = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(companies)").fetchall()
+    }
+    if "gmail_draft_id" not in columns:
+        conn.execute("ALTER TABLE companies ADD COLUMN gmail_draft_id TEXT")
 
 
 def fetch_all(query: str, params: Iterable[Any] = ()) -> list[dict[str, Any]]:

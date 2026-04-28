@@ -1,5 +1,8 @@
 .venv/
-venv/
-env/
 __pycache__/
 *.pyc
+.env
+credentials.json
+data/gmail_token.json
+data/akquise.db
+exports/*.csv
