@@ -13,6 +13,7 @@ Die App versendet keine E-Mails automatisch. Jeder Entwurf muss manuell geprueft
 - Template-Fallback ohne OpenAI API-Key
 - Optional OpenAI API zur Formulierung, wenn `OPENAI_API_KEY` gesetzt ist
 - Optional Gmail-Drafts erstellen mit OAuth-Scope `gmail.compose`
+- Website per KI analysieren und Formularfelder inklusive E-Mail-Text vorbefüllen
 - Erstmail als gesendet markieren und Follow-up automatisch auf +7 Tage setzen
 - Follow-up-Liste und Follow-up-Entwurf
 - Suche und Filter nach Unternehmen, Stadt, Themen, Status und Angebotswinkel
@@ -87,13 +88,14 @@ Beim ersten Start wird die SQLite-Datenbank automatisch angelegt. Falls die Date
 ## Nutzung
 
 1. Im Tab `Unternehmen` ein Unternehmen anlegen. Pflichtfeld ist nur `company_name`; E-Mail ist optional und wird nur grob validiert.
-2. Optional beim Speichern `Nach dem Speichern Gmail-Entwurf vorbereiten` aktivieren. Das erzeugt nur einen lokalen Mailtext und waehlt das Unternehmen im Tab `Mail-Entwuerfe` vor.
-3. Im Tab `Mail-Entwuerfe` ein Unternehmen auswaehlen und aus Website-Notizen, relevanten Themen und Angebotswinkel einen Entwurf erzeugen.
-4. Den Entwurf pruefen und per Button beim Unternehmen speichern.
-5. Optional nach der Pruefung `Gmail-Draft erstellen` klicken. Dadurch entsteht ein Entwurf in Gmail, aber es wird nichts gesendet. Die App speichert die Gmail-Draft-ID und, sofern von Gmail geliefert, eine Message-ID fuer einen Gmail-Weblink.
-6. Im Tab `Follow-ups` nach manuell versendeter Erstmail den Button `Als Erstmail gesendet markieren` nutzen. Die App setzt dann `first_contact_date`, `last_contact_date` und `follow_up_date` automatisch auf heute plus 7 Tage.
-7. Faellige Follow-ups erscheinen im Dashboard und im Follow-up-Tab.
-8. Im Tab `Import/Export` Daten als CSV importieren oder exportieren.
+2. Optional im Anlegen-Tab `Automatisch mit KI ausfuellen` nutzen. Die App liest die Website, erstellt einen Vorschlag fuer Stammdaten, relevante Themen, Website-Notizen, Hypothese, Angebotswinkel und E-Mail-Text. Der Vorschlag muss vor dem Speichern manuell geprueft werden.
+3. Optional beim Speichern `Nach dem Speichern Gmail-Entwurf vorbereiten` aktivieren. Das erzeugt nur einen lokalen Mailtext und waehlt das Unternehmen im Tab `Mail-Entwuerfe` vor.
+4. Im Tab `Mail-Entwuerfe` ein Unternehmen auswaehlen und aus Website-Notizen, relevanten Themen und Angebotswinkel einen Entwurf erzeugen.
+5. Den Entwurf pruefen und per Button beim Unternehmen speichern.
+6. Optional nach der Pruefung `Gmail-Draft erstellen` klicken. Dadurch entsteht ein Entwurf in Gmail, aber es wird nichts gesendet. Die App speichert die Gmail-Draft-ID und, sofern von Gmail geliefert, eine Message-ID fuer einen Gmail-Weblink.
+7. Im Tab `Follow-ups` nach manuell versendeter Erstmail den Button `Als Erstmail gesendet markieren` nutzen. Die App setzt dann `first_contact_date`, `last_contact_date` und `follow_up_date` automatisch auf heute plus 7 Tage.
+8. Faellige Follow-ups erscheinen im Dashboard und im Follow-up-Tab.
+9. Im Tab `Import/Export` Daten als CSV importieren oder exportieren.
 
 ## Datenschutz und Grenzen
 

@@ -40,6 +40,7 @@ from gmail_service import (
     create_gmail_draft,
     gmail_status,
 )
+from website_ai_service import WebsiteAnalysisError, analyze_company_website
 
 
 DISPLAY_COLUMNS = [
@@ -117,13 +118,57 @@ def select_index(options: list[str], current_value: str) -> int:
 
 def form_defaults(company: dict[str, Any] | None = None) -> dict[str, str]:
     company = company or {}
-    return {field: str(company.get(field) or "") for field in COMPANY_FIELDS}
+    defaults = {field: str(company.get(field) or "") for field in COMPANY_FIELDS}
+    if not company:
+        prefill = st.session_state.get("company_ai_prefill", {})
+        for field, value in prefill.items():
+            if field in defaults and value:
+                defaults[field] = str(value)
+    return defaults
+
+
+def render_ai_prefill_box() -> None:
+    with st.expander("Automatisch mit KI ausfüllen", expanded=False):
+        st.caption(
+            "Die App liest die angegebene Website, extrahiert öffentlich sichtbare Informationen "
+            "und füllt das Formular als Vorschlag vor. Bitte danach alles kurz prüfen."
+        )
+        url = st.text_input(
+            "Website für KI-Analyse",
+            value=st.session_state.get("ai_prefill_url", ""),
+            placeholder="https://www.beispiel-hausverwaltung.de",
+            key="ai_prefill_url",
+        )
+
+        col1, col2 = st.columns([1, 2])
+        disabled = not bool(OPENAI_API_KEY)
+        if col1.button("Automatisch mit KI ausfüllen", disabled=disabled):
+            try:
+                with st.spinner("Website wird gelesen und Felder werden ausgefüllt..."):
+                    st.session_state["company_ai_prefill"] = analyze_company_website(url)
+                    st.session_state["company_form_version"] = st.session_state.get("company_form_version", 0) + 1
+                st.success("KI-Vorschlag erstellt. Das Formular darunter wurde vorbefüllt.")
+                st.rerun()
+            except WebsiteAnalysisError as exc:
+                st.error(str(exc))
+
+        if col2.button("KI-Vorschlag zurücksetzen"):
+            st.session_state.pop("company_ai_prefill", None)
+            st.session_state["company_form_version"] = st.session_state.get("company_form_version", 0) + 1
+            st.success("KI-Vorschlag zurückgesetzt.")
+            st.rerun()
+
+        if disabled:
+            st.info("Kein OpenAI API-Key konfiguriert. Die KI-Ausfüllfunktion ist deshalb deaktiviert.")
+        elif st.session_state.get("company_ai_prefill"):
+            st.success("Aktueller KI-Vorschlag ist geladen und kann unten bearbeitet werden.")
 
 
 def render_company_form(company: dict[str, Any] | None = None) -> None:
     defaults = form_defaults(company)
     is_edit = company is not None
-    form_key = f"company_form_{company['id']}" if is_edit else "company_form_new"
+    form_version = st.session_state.get("company_form_version", 0)
+    form_key = f"company_form_{company['id']}" if is_edit else f"company_form_new_{form_version}"
 
     with st.form(form_key):
         st.subheader("Stammdaten")
@@ -236,6 +281,8 @@ def render_company_form(company: dict[str, Any] | None = None) -> None:
             else:
                 saved_id = create_company(payload)
                 message = "Unternehmen angelegt."
+                st.session_state.pop("company_ai_prefill", None)
+                st.session_state["company_form_version"] = form_version + 1
 
             if prepare_gmail_draft:
                 saved_company = get_company(saved_id) or payload
@@ -304,6 +351,7 @@ def render_companies() -> None:
 
     create_tab, edit_tab = st.tabs(["Anlegen", "Bearbeiten/Löschen"])
     with create_tab:
+        render_ai_prefill_box()
         render_company_form()
 
     with edit_tab:
