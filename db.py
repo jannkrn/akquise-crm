@@ -33,6 +33,10 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
     }
     if "gmail_draft_id" not in columns:
         conn.execute("ALTER TABLE companies ADD COLUMN gmail_draft_id TEXT")
+    if "gmail_draft_message_id" not in columns:
+        conn.execute("ALTER TABLE companies ADD COLUMN gmail_draft_message_id TEXT")
+    if "gmail_draft_thread_id" not in columns:
+        conn.execute("ALTER TABLE companies ADD COLUMN gmail_draft_thread_id TEXT")
 
 
 def fetch_all(query: str, params: Iterable[Any] = ()) -> list[dict[str, Any]]:

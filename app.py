@@ -34,7 +34,12 @@ from email_generator import (
     generate_follow_up_email,
     generate_initial_email,
 )
-from gmail_service import GmailDraftError, create_gmail_draft, gmail_status
+from gmail_service import (
+    GmailDraftError,
+    build_gmail_draft_url,
+    create_gmail_draft,
+    gmail_status,
+)
 
 
 DISPLAY_COLUMNS = [
@@ -46,7 +51,8 @@ DISPLAY_COLUMNS = [
     "company_type",
     "relevant_topics",
     "offer_angle",
-    "gmail_draft_id",
+    "action_type",
+    "gmail_draft_url",
     "status",
     "follow_up_date",
     "response_type",
@@ -64,7 +70,16 @@ def setup() -> None:
 
 
 def to_df(rows: list[dict[str, Any]]) -> pd.DataFrame:
-    df = pd.DataFrame(rows)
+    enriched_rows = []
+    for row in rows:
+        item = dict(row)
+        item["gmail_draft_url"] = build_gmail_draft_url(
+            message_id=str(item.get("gmail_draft_message_id") or ""),
+            draft_id=str(item.get("gmail_draft_id") or ""),
+        )
+        enriched_rows.append(item)
+
+    df = pd.DataFrame(enriched_rows)
     if df.empty:
         return pd.DataFrame(columns=DISPLAY_COLUMNS)
     return df
@@ -74,7 +89,19 @@ def display_table(rows: list[dict[str, Any]], columns: list[str] | None = None) 
     df = to_df(rows)
     selected_columns = columns or DISPLAY_COLUMNS
     available = [column for column in selected_columns if column in df.columns]
-    st.dataframe(df[available], use_container_width=True, hide_index=True)
+    column_config = {}
+    if "gmail_draft_url" in available:
+        column_config["gmail_draft_url"] = st.column_config.LinkColumn(
+            "Gmail-Draft",
+            display_text="öffnen",
+            help="Direktlink ist ein Gmail-Weblink auf Basis der von der API gelieferten Message-ID.",
+        )
+    st.dataframe(
+        df[available],
+        use_container_width=True,
+        hide_index=True,
+        column_config=column_config,
+    )
 
 
 def company_options(rows: list[dict[str, Any]]) -> dict[str, int]:
@@ -235,12 +262,14 @@ def render_company_form(company: dict[str, Any] | None = None) -> None:
 def render_dashboard() -> None:
     stats = dashboard_stats()
     due = stats["due_followups"]
+    action_items = stats["dashboard_action_items"]
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("Unternehmen gesamt", stats["total"])
-    col2.metric("Follow-ups fällig", len(due))
-    col3.metric("Antwortquote", f"{stats['response_rate']:.1%}")
-    col4.metric("Gesprächsquote", f"{stats['conversation_rate']:.1%}")
+    col2.metric("Offene Entwürfe", stats["open_draft_count"])
+    col3.metric("Follow-ups fällig", len(due))
+    col4.metric("Antwortquote", f"{stats['response_rate']:.1%}")
+    col5.metric("Gesprächsquote", f"{stats['conversation_rate']:.1%}")
 
     col1, col2 = st.columns([1, 2])
     with col1:
@@ -256,10 +285,10 @@ def render_dashboard() -> None:
         display_table(list_companies(), DISPLAY_COLUMNS)
 
     st.subheader("Heute oder überfällig")
-    if due:
-        display_table(due, DISPLAY_COLUMNS)
+    if action_items:
+        display_table(action_items, DISPLAY_COLUMNS)
     else:
-        st.success("Keine fälligen Follow-ups.")
+        st.success("Keine offenen Entwürfe oder fälligen Follow-ups.")
 
 
 def render_companies() -> None:
@@ -395,7 +424,7 @@ def render_email_drafts() -> None:
 
         if st.button("Gmail-Draft erstellen", disabled=not can_create_draft):
             try:
-                draft_id = create_gmail_draft(
+                gmail_draft = create_gmail_draft(
                     to=str(company.get("email") or ""),
                     subject=subject,
                     body=body,
@@ -406,17 +435,27 @@ def render_email_drafts() -> None:
                         "email_subject": subject,
                         "email_body": body,
                         "email_variant": variant,
-                        "gmail_draft_id": draft_id,
+                        "gmail_draft_id": gmail_draft["draft_id"],
+                        "gmail_draft_message_id": gmail_draft["message_id"],
+                        "gmail_draft_thread_id": gmail_draft["thread_id"],
                         "status": "Entwurf erstellt",
                     },
                 )
-                st.session_state["flash_success"] = f"Gmail-Draft erstellt. Draft-ID: {draft_id}"
+                st.session_state["flash_success"] = (
+                    f"Gmail-Draft erstellt. Draft-ID: {gmail_draft['draft_id']}"
+                )
                 st.rerun()
             except GmailDraftError as exc:
                 st.error(str(exc))
 
         if company.get("gmail_draft_id"):
             st.caption(f"Gmail-Draft-ID: {company['gmail_draft_id']}")
+            draft_url = build_gmail_draft_url(
+                message_id=str(company.get("gmail_draft_message_id") or ""),
+                draft_id=str(company.get("gmail_draft_id") or ""),
+            )
+            if draft_url:
+                st.link_button("Gmail-Draft öffnen", draft_url)
         elif not gmail_config["credentials_exists"]:
             st.caption("Gmail ist noch nicht konfiguriert. Lege credentials.json im Projektordner ab.")
         elif not has_recipient:
@@ -591,11 +630,29 @@ def render_settings() -> None:
     st.write(f"Datenbank: `{DB_PATH}`")
     st.write(f"Exports: `{EXPORTS_DIR}`")
     st.write("OpenAI API-Key:", "konfiguriert" if OPENAI_API_KEY else "nicht konfiguriert")
+
+    st.subheader("Gmail-Drafts")
     gmail_config = gmail_status()
-    st.write("Gmail OAuth-Datei:", "gefunden" if gmail_config["credentials_exists"] else "nicht gefunden")
     st.write(f"Gmail Credentials: `{gmail_config['credentials_path']}`")
     st.write(f"Gmail Token: `{gmail_config['token_path']}`")
     st.write(f"Gmail Scope: `{gmail_config['scope']}`")
+
+    if not gmail_config["credentials_exists"]:
+        st.warning("OAuth-Datei nicht gefunden. Lege credentials.json im Projektordner ab.")
+    elif not gmail_config["credentials_valid"]:
+        st.error(gmail_config["credentials_error"] or "OAuth-Datei gefunden, aber nicht als Desktop-App erkannt.")
+    elif not gmail_config["token_exists"]:
+        st.success("OAuth-Datei gefunden und als Desktop-App erkannt.")
+        st.info(
+            "Der Gmail-Login ist noch nicht erledigt. Er startet automatisch beim ersten Klick auf "
+            "`Gmail-Draft erstellen`."
+        )
+        st.caption(
+            "Falls Google 403 access_denied meldet: In der Google Cloud Console unter "
+            "Google Auth Platform > Audience/Test users die eigene Gmail-Adresse als Testnutzer hinzufügen."
+        )
+    else:
+        st.success("Gmail ist verbunden. Drafts können erstellt werden.")
 
     st.subheader("Sicherheit")
     st.info(

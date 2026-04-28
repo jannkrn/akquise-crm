@@ -52,6 +52,8 @@ COMPANY_FIELDS = [
     "email_body",
     "email_variant",
     "gmail_draft_id",
+    "gmail_draft_message_id",
+    "gmail_draft_thread_id",
     "status",
     "first_contact_date",
     "follow_up_date",
@@ -216,6 +218,39 @@ def due_followups() -> list[dict[str, Any]]:
     )
 
 
+def dashboard_action_items() -> list[dict[str, Any]]:
+    placeholders = ",".join(["?"] * len(TERMINAL_STATUSES))
+    return fetch_all(
+        f"""
+        SELECT *,
+            CASE
+                WHEN status = 'Entwurf erstellt' THEN 'Entwurf prüfen'
+                WHEN follow_up_date IS NOT NULL
+                  AND follow_up_date != ''
+                  AND date(follow_up_date) <= date('now', 'localtime')
+                  THEN 'Follow-up fällig'
+                ELSE 'Prüfen'
+            END AS action_type
+        FROM companies
+        WHERE (
+            status = 'Entwurf erstellt'
+            OR (
+                follow_up_date IS NOT NULL
+                AND follow_up_date != ''
+                AND date(follow_up_date) <= date('now', 'localtime')
+            )
+        )
+        AND status NOT IN ({placeholders})
+        ORDER BY
+            CASE WHEN status = 'Entwurf erstellt' THEN 0 ELSE 1 END,
+            CASE WHEN follow_up_date IS NULL OR follow_up_date = '' THEN 1 ELSE 0 END,
+            follow_up_date ASC,
+            updated_at DESC
+        """,
+        sorted(TERMINAL_STATUSES),
+    )
+
+
 def followups_df() -> pd.DataFrame:
     rows = fetch_all(
         """
@@ -246,6 +281,8 @@ def dashboard_stats() -> dict[str, Any]:
         "SELECT status, COUNT(*) AS count FROM companies GROUP BY status ORDER BY count DESC"
     )
     due = due_followups()
+    action_items = dashboard_action_items()
+    open_drafts = [row for row in all_rows if row.get("status") == "Entwurf erstellt"]
     contacted = [
         row
         for row in all_rows
@@ -266,6 +303,8 @@ def dashboard_stats() -> dict[str, Any]:
         "total": total,
         "status_counts": status_counts,
         "due_followups": due,
+        "dashboard_action_items": action_items,
+        "open_draft_count": len(open_drafts),
         "response_rate": len(responses) / contacted_count if contacted_count else 0,
         "conversation_rate": len(conversations) / contacted_count if contacted_count else 0,
     }
