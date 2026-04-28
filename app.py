@@ -48,6 +48,12 @@ from gmail_service import (
     create_gmail_draft,
     gmail_status,
 )
+from prompt_store import (
+    DEFAULT_SENDER_PROMPT,
+    get_sender_prompt,
+    reset_sender_prompt,
+    save_sender_prompt,
+)
 from website_ai_service import WebsiteAnalysisError, analyze_company_website
 
 
@@ -696,6 +702,29 @@ def render_settings() -> None:
         )
     if ENV_FILE_EXISTS and not OPENAI_API_KEY:
         st.warning("Die .env-Datei existiert, aber OPENAI_API_KEY ist leer. Nach dem Eintragen Streamlit neu starten.")
+
+    st.subheader("KI-Prompt")
+    st.caption(
+        "Dieser Prompt wird bei der Website-Analyse und bei KI-generierten Mailentwürfen immer mitgegeben."
+    )
+    current_prompt = get_sender_prompt()
+    edited_prompt = st.text_area(
+        "Bearbeitbarer Profil- und Schreibprompt",
+        value=current_prompt,
+        height=320,
+        key="sender_prompt_editor",
+    )
+    col1, col2 = st.columns([1, 2])
+    if col1.button("Prompt speichern"):
+        save_sender_prompt(edited_prompt)
+        st.success("Prompt gespeichert. Neue KI-Entwürfe nutzen ab sofort diesen Text.")
+        st.rerun()
+    if col2.button("Standardprompt wiederherstellen"):
+        reset_sender_prompt()
+        st.success("Standardprompt wiederhergestellt.")
+        st.rerun()
+    with st.expander("Standardprompt anzeigen"):
+        st.code(DEFAULT_SENDER_PROMPT, language="text")
 
     st.subheader("Gmail-Drafts")
     gmail_config = gmail_status()

@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 from config import OPENAI_API_KEY, OPENAI_MODEL
+from prompt_store import get_sender_prompt
 
 
 def _clean(value: Any) -> str:
@@ -154,8 +155,12 @@ def generate_openai_email(company: dict[str, Any], tone: str = "sachlich") -> di
         raise RuntimeError("Das Paket 'openai' ist nicht installiert.") from exc
 
     client = OpenAI(api_key=OPENAI_API_KEY)
-    system_prompt = """
+    sender_prompt = get_sender_prompt()
+    system_prompt = f"""
 Du formulierst kurze deutsche B2B-Akquise-Mails für kleine Immobilienverwaltungen.
+Nutze immer diesen bearbeitbaren Absenderprompt:
+{sender_prompt}
+
 Regeln:
 - Keine übertriebenen Versprechen.
 - Keine erfundenen Ansprechpartner, Prozesse oder Probleme.
@@ -180,10 +185,7 @@ Jann Körner
             "pain_point_hypothesis": _clean(company.get("pain_point_hypothesis")),
             "offer_angle": _clean(company.get("offer_angle")),
             "tone": tone,
-            "sender_profile": (
-                "Accounting-Erfahrung in einer Immobilienfirma; aktuell Master in Wirtschaftsinformatik; "
-                "Werkstudent bei Rossmann im Bereich Prozessautomatisierung sowie Datenanalyse und Data Engineering."
-            ),
+            "sender_prompt": sender_prompt,
         },
         ensure_ascii=False,
     )

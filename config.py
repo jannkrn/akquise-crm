@@ -24,6 +24,26 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
 OPENAI_CONFIGURED = bool(OPENAI_API_KEY)
 ENV_FILE_EXISTS = ENV_PATH.exists()
 
+SENDER_NAME = "Jann Körner"
+SENDER_PROFILE = (
+    "Ich habe bei einer Immobilienfirma im Accounting gearbeitet und kenne daher viele "
+    "manuelle Prozesse aus der Praxis, insbesondere rund um ERP-nahe Abläufe, Excel, "
+    "Abstimmungen, Abrechnungen und kaufmännische Verwaltung. Momentan mache ich meinen "
+    "Master in Wirtschaftsinformatik und arbeite als Werkstudent bei Rossmann im Bereich "
+    "Prozessautomatisierung, Datenanalyse und Data Engineering. Ich möchte kleinen "
+    "Immobilienunternehmen keine große Beratung verkaufen, sondern kleine Pilotprojekte "
+    "anbieten, bei denen 1-2 wiederkehrende Prozesse geprüft und nur bei erkennbarem Nutzen "
+    "vereinfacht oder automatisiert werden."
+)
+
+SENDER_PROFILE_MAIL_HINT = (
+    "Nutze dieses Profil in der Mail konkret, aber knapp. Es soll Substanz vermitteln: "
+    "Accounting-Erfahrung in einer Immobilienfirma, aktueller Master in Wirtschaftsinformatik "
+    "und Werkstudententätigkeit bei Rossmann in Prozessautomatisierung, Datenanalyse und "
+    "Data Engineering. Vermeide Lebenslaufstil; verbinde das Profil mit ERP-/Excel-nahen "
+    "Abläufen, Auswertungen, Datenqualität und kleinen Automatisierungen."
+)
+
 
 def env_example_contains_secret() -> bool:
     if not ENV_EXAMPLE_PATH.exists():

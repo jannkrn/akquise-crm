@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 
 from config import OPENAI_API_KEY, OPENAI_MODEL
 from crm_service import COMPANY_TYPES, OFFER_ANGLES
+from prompt_store import get_sender_prompt
 
 
 class WebsiteAnalysisError(RuntimeError):
@@ -95,6 +96,7 @@ def analyze_company_website(url: str) -> dict[str, str]:
         raise WebsiteAnalysisError("Das Paket 'openai' ist nicht installiert.") from exc
 
     client = OpenAI(api_key=OPENAI_API_KEY)
+    sender_prompt = get_sender_prompt()
     system_prompt = f"""
 Du analysierst öffentlich sichtbare Websites von Immobilienunternehmen für ein lokales Akquise-CRM.
 
@@ -107,6 +109,9 @@ Zielangebot von Jann Körner:
 - Werkstudent bei Rossmann in Prozessautomatisierung sowie Datenanalyse/Data Engineering
 - Kleine Pilotprojekte: 1-2 wiederkehrende Prozesse prüfen und ggf. vereinfachen
 - Keine große Beratung, keine automatisierten Mailversprechen
+
+Nutze immer diesen bearbeitbaren Absenderprompt:
+{sender_prompt}
 
 Erlaubte company_type-Werte: {", ".join(COMPANY_TYPES)}
 Erlaubte offer_angle-Werte: {", ".join(OFFER_ANGLES)}
