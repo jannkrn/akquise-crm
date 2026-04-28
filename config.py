@@ -15,11 +15,24 @@ DATA_DIR = BASE_DIR / "data"
 EXPORTS_DIR = BASE_DIR / "exports"
 DB_PATH = DATA_DIR / "akquise.db"
 ENV_PATH = BASE_DIR / ".env"
+ENV_EXAMPLE_PATH = BASE_DIR / ".env.example"
 
 load_dotenv(ENV_PATH)
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
+OPENAI_CONFIGURED = bool(OPENAI_API_KEY)
+ENV_FILE_EXISTS = ENV_PATH.exists()
+
+
+def env_example_contains_secret() -> bool:
+    if not ENV_EXAMPLE_PATH.exists():
+        return False
+    try:
+        content = ENV_EXAMPLE_PATH.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return "OPENAI_API_KEY=sk-" in content
 
 
 def _path_from_env(name: str, default: Path) -> Path:

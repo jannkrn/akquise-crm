@@ -7,7 +7,15 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from config import DB_PATH, EXPORTS_DIR, OPENAI_API_KEY, ensure_directories
+from config import (
+    DB_PATH,
+    ENV_FILE_EXISTS,
+    ENV_PATH,
+    EXPORTS_DIR,
+    OPENAI_API_KEY,
+    ensure_directories,
+    env_example_contains_secret,
+)
 from crm_service import (
     COMPANY_FIELDS,
     COMPANY_TYPES,
@@ -159,7 +167,9 @@ def render_ai_prefill_box() -> None:
             st.rerun()
 
         if disabled:
-            st.info("Kein OpenAI API-Key konfiguriert. Die KI-Ausfüllfunktion ist deshalb deaktiviert.")
+            st.info(
+                "Kein OpenAI API-Key konfiguriert. Trage einen Key in `.env` ein und starte Streamlit neu."
+            )
         elif st.session_state.get("company_ai_prefill"):
             st.success("Aktueller KI-Vorschlag ist geladen und kann unten bearbeitet werden.")
 
@@ -677,7 +687,15 @@ def render_settings() -> None:
     st.subheader("Lokale Konfiguration")
     st.write(f"Datenbank: `{DB_PATH}`")
     st.write(f"Exports: `{EXPORTS_DIR}`")
+    st.write(f".env-Datei: `{ENV_PATH}`")
+    st.write(".env vorhanden:", "ja" if ENV_FILE_EXISTS else "nein")
     st.write("OpenAI API-Key:", "konfiguriert" if OPENAI_API_KEY else "nicht konfiguriert")
+    if env_example_contains_secret():
+        st.error(
+            "In .env.example scheint ein echter OpenAI-Key zu stehen. Bitte dort entfernen und den Key nur in .env speichern."
+        )
+    if ENV_FILE_EXISTS and not OPENAI_API_KEY:
+        st.warning("Die .env-Datei existiert, aber OPENAI_API_KEY ist leer. Nach dem Eintragen Streamlit neu starten.")
 
     st.subheader("Gmail-Drafts")
     gmail_config = gmail_status()
