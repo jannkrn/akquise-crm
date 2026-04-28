@@ -45,6 +45,8 @@ OPENAI_MODEL=gpt-4o-mini
 ## Start
 
 ```powershell
+cd C:\Jann\Business\Immobilien\akquise-crm
+.\.venv\Scripts\Activate.ps1
 streamlit run app.py
 
 ```
