@@ -141,14 +141,17 @@ Jann Körner
         ensure_ascii=False,
     )
 
-    response = client.chat.completions.create(
-        model=OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0.2,
-    )
+    try:
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.2,
+        )
+    except Exception as exc:
+        raise WebsiteAnalysisError(f"OpenAI-Analyse fehlgeschlagen: {exc}") from exc
     content = response.choices[0].message.content or ""
     parsed = _extract_json(content)
 

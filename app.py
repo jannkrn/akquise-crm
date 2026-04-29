@@ -16,6 +16,7 @@ from config import (
     ensure_directories,
     env_example_contains_secret,
 )
+from company_discovery_service import CompanyDiscoveryError, discover_company_candidates
 from crm_service import (
     COMPANY_FIELDS,
     COMPANY_TYPES,
@@ -178,6 +179,72 @@ def render_ai_prefill_box() -> None:
             )
         elif st.session_state.get("company_ai_prefill"):
             st.success("Aktueller KI-Vorschlag ist geladen und kann unten bearbeitet werden.")
+
+
+def render_company_discovery_box() -> None:
+    with st.expander("Weitere passende Unternehmen finden", expanded=False):
+        st.caption(
+            "Die App sucht öffentlich sichtbare Hausverwaltungen, Immobilienverwaltungen und WEG-Verwaltungen "
+            "im angegebenen Umfeld, filtert bereits gespeicherte Websites heraus und analysiert neue Kandidaten per KI."
+        )
+        col1, col2, col3 = st.columns([2, 1, 1])
+        location = col1.text_input(
+            "Ort oder Region",
+            value=st.session_state.get("discovery_location", ""),
+            placeholder="z. B. Leipzig, Halle, Sachsen-Anhalt",
+            key="discovery_location",
+        )
+        radius_km = col2.number_input("Umkreis in km", min_value=5, max_value=250, value=30, step=5)
+        max_candidates = col3.number_input("Vorschläge", min_value=1, max_value=10, value=5, step=1)
+
+        disabled = not bool(OPENAI_API_KEY)
+        if st.button("Passende Unternehmen suchen", disabled=disabled):
+            try:
+                with st.spinner("Suche läuft, Websites werden geprüft und per KI analysiert..."):
+                    st.session_state["company_discovery_results"] = discover_company_candidates(
+                        location=location,
+                        radius_km=int(radius_km),
+                        max_candidates=int(max_candidates),
+                    )
+                st.success("Suche abgeschlossen.")
+                st.rerun()
+            except CompanyDiscoveryError as exc:
+                st.error(str(exc))
+
+        if disabled:
+            st.info("Kein OpenAI API-Key konfiguriert. Die Suche mit KI-Analyse ist deshalb deaktiviert.")
+
+        candidates = st.session_state.get("company_discovery_results", [])
+        if not candidates:
+            return
+
+        st.write(f"{len(candidates)} neue Kandidaten gefunden:")
+        for index, candidate in enumerate(candidates, start=1):
+            analysis = candidate.get("analysis") or {}
+            title = analysis.get("company_name") or candidate.get("title") or "Unbekanntes Unternehmen"
+            with st.container(border=True):
+                st.markdown(f"**{index}. {title}**")
+                st.write(candidate.get("website", ""))
+                if candidate.get("snippet"):
+                    st.caption(candidate["snippet"])
+                if candidate.get("error"):
+                    st.warning(f"KI-Analyse nicht vollständig: {candidate['error']}")
+                elif analysis:
+                    st.write("Themen:", analysis.get("relevant_topics") or "-")
+                    st.write("Ansatz:", analysis.get("offer_angle") or "-")
+                    st.caption(analysis.get("website_notes") or "")
+
+                if st.button("Ins Formular übernehmen", key=f"use_discovery_candidate_{index}"):
+                    prefill = {
+                        "company_name": title,
+                        "website": candidate.get("website", ""),
+                        "status": "Entwurf erstellt" if analysis.get("email_body") else "Recherchiert",
+                    }
+                    prefill.update(analysis)
+                    st.session_state["company_ai_prefill"] = prefill
+                    st.session_state["company_form_version"] = st.session_state.get("company_form_version", 0) + 1
+                    st.success("Kandidat wurde ins Formular übernommen.")
+                    st.rerun()
 
 
 def render_company_form(company: dict[str, Any] | None = None) -> None:
@@ -379,6 +446,7 @@ def render_companies() -> None:
 
     create_tab, edit_tab = st.tabs(["Anlegen", "Bearbeiten/Löschen"])
     with create_tab:
+        render_company_discovery_box()
         render_ai_prefill_box()
         render_company_form()
 
