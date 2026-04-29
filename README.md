@@ -24,7 +24,7 @@ Die App versendet keine E-Mails automatisch. Jeder Entwurf muss manuell geprueft
 ## Installation
 
 ```powershell
-cd C:\Jann\Business\Immobilien\akquise-crm
+cd ...\akquise-crm
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -75,7 +75,7 @@ Loesung:
 ## Start
 
 ```powershell
-cd C:\Jann\Business\Immobilien\akquise-crm
+cd ...\akquise-crm
 .\.venv\Scripts\Activate.ps1
 streamlit run app.py
 
