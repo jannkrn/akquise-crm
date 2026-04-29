@@ -350,6 +350,18 @@ def render_dashboard() -> None:
     st.subheader("Heute oder überfällig")
     if action_items:
         display_table(action_items, DISPLAY_COLUMNS)
+        draft_items = [item for item in action_items if item.get("status") == "Entwurf erstellt"]
+        if draft_items:
+            st.caption("Nach manuellem Versand in Gmail hier als Erstmail gesendet markieren.")
+            for item in draft_items:
+                label = f"{item.get('company_name', 'Unternehmen')} als Erstmail gesendet markieren"
+                if st.button(label, key=f"dashboard_first_mail_sent_{item['id']}"):
+                    mark_first_mail_sent(int(item["id"]))
+                    st.session_state["flash_success"] = (
+                        f"{item.get('company_name', 'Unternehmen')} wurde als Erstmail gesendet markiert. "
+                        "Follow-up wurde auf +7 Tage gesetzt."
+                    )
+                    st.rerun()
     else:
         st.success("Keine offenen Entwürfe oder fälligen Follow-ups.")
 
