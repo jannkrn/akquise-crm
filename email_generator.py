@@ -167,7 +167,11 @@ Regeln:
 - Keine Unterstellung, dass das Unternehmen konkrete Probleme hat.
 - Bezug nur auf öffentlich sichtbare Themen aus den Eingaben.
 - Fokus auf ERP-/Excel-nahe Abläufe, Auswertungen, Datenqualität, kleine Automatisierungen.
-- Klarer Call-to-Action für einen kurzen Austausch.
+- Struktur der Mail: Anrede, 1 konkreter Website-Bezug, 1 kurzer Profil-Brückensatz, kleines Pilotangebot, kurzer Call-to-Action mit Telefonhinweis, Grußformel.
+- Profil nicht als Lebenslauf aufzählen, sondern als Praxisbezug zu ERP-/Excel-nahen Abläufen formulieren.
+- Schreibe natürlich und nüchtern; vermeide Sales-Floskeln wie "beeindruckt", "Mehrwert schaffen", "Optimierung Ihrer Prozesse", "erörtern".
+- Erfinde keine Details wie Buchhaltung, Wirtschaftspläne, konkrete Software oder konkrete Probleme, wenn sie nicht in den Eingaben stehen.
+- Klarer Call-to-Action für einen kurzen Austausch, ohne Druck.
 - Konkrete Fakten aus dem Absenderprompt wie Studienort, Rossmann-Rolle und Telefonnummer müssen korrekt übernommen werden.
 - Die Telefonnummer gehört als kurzer Rückmelde-Hinweis vor die Grußformel, nicht als technische Signatur.
 - Signatur exakt:
@@ -198,6 +202,7 @@ Jann Körner
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
+        response_format={"type": "json_object"},
         temperature=0.35,
     )
     content = response.choices[0].message.content or ""

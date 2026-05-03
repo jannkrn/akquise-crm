@@ -20,7 +20,8 @@ ENV_EXAMPLE_PATH = BASE_DIR / ".env.example"
 load_dotenv(ENV_PATH)
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4-mini").strip()
+OPENAI_WEBSITE_MODEL = os.getenv("OPENAI_WEBSITE_MODEL", OPENAI_MODEL).strip()
 OPENAI_CONFIGURED = bool(OPENAI_API_KEY)
 ENV_FILE_EXISTS = ENV_PATH.exists()
 

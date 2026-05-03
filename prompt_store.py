@@ -39,6 +39,18 @@ def enforce_sender_prompt_in_email(body: str, prompt: str | None = None) -> str:
     """Keep concrete sender facts from the editable prompt in generated drafts."""
     cleaned = body.strip().replace("\r\n", "\n").replace("\r", "\n")
     source = prompt if prompt is not None else get_sender_prompt()
+    profile_sentence = (
+        "Aus meiner Zeit im Accounting einer Immobilienfirma kenne ich ERP- und Excel-nahe "
+        "Abstimmungen, Abrechnungen und kaufmännische Verwaltungsabläufe aus der Praxis. "
+        "Heute mache ich meinen Master in Wirtschaftsinformatik in Halle und arbeite bei "
+        "Rossmann als Werkstudent im Bereich Prozessautomatisierung, Datenanalyse und Data Engineering."
+    )
+
+    cleaned = _replace_sales_phrases(cleaned)
+
+    if _should_use_profile_bridge(source):
+        cleaned = _merge_profile_bridge(cleaned, profile_sentence)
+        cleaned = _remove_duplicate_profile_fragments(cleaned, profile_sentence)
 
     if "Halle" in source and "Halle" not in cleaned:
         if "Master in Wirtschaftsinformatik" in cleaned:
@@ -54,13 +66,103 @@ def enforce_sender_prompt_in_email(body: str, prompt: str | None = None) -> str:
             )
 
     phone = get_sender_phone(source)
+    cleaned = _normalize_phone_cta(cleaned, phone)
     if phone and phone not in re.sub(r"\s+", "", cleaned):
         cleaned = _insert_before_signoff(
             cleaned,
-            f"Rückmeldung gerne auch per Telefon: {phone}",
+            f"Wenn das grundsätzlich interessant ist, freue ich mich über einen kurzen Austausch; Rückmeldung gerne auch per Telefon: {phone}.",
         )
 
+    return _normalize_mail_spacing(cleaned)
+
+
+def _should_use_profile_bridge(prompt: str) -> bool:
+    return all(term in prompt for term in ["Accounting", "Rossmann", "Wirtschaftsinformatik"])
+
+
+def _merge_profile_bridge(body: str, profile_sentence: str) -> str:
+    paragraphs = body.split("\n\n")
+    for index, paragraph in enumerate(paragraphs):
+        lowered = paragraph.lower()
+        if "rossmann" in lowered or "master in wirtschaftsinformatik" in lowered:
+            kept_sentences = [
+                sentence
+                for sentence in re.split(r"(?<=[.!?])\s+", paragraph.strip())
+                if not _is_profile_fragment(sentence)
+            ]
+            if kept_sentences:
+                paragraphs[index] = " ".join(kept_sentences)
+                paragraphs.insert(index + 1, profile_sentence)
+            else:
+                paragraphs[index] = profile_sentence
+            return "\n\n".join(paragraphs)
+
+    insert_at = 1 if len(paragraphs) > 1 else len(paragraphs)
+    paragraphs.insert(insert_at, profile_sentence)
+    return "\n\n".join(paragraphs)
+
+
+def _remove_duplicate_profile_fragments(body: str, profile_sentence: str) -> str:
+    paragraphs = []
+    profile_seen = False
+    for paragraph in body.split("\n\n"):
+        if paragraph.strip() == profile_sentence:
+            if profile_seen:
+                continue
+            profile_seen = True
+            paragraphs.append(paragraph)
+            continue
+        if profile_seen and _is_profile_fragment(paragraph):
+            continue
+        paragraphs.append(paragraph)
+    return "\n\n".join(paragraphs)
+
+
+def _is_profile_fragment(text: str) -> bool:
+    lowered = text.lower().strip()
+    return "rossmann" in lowered or "master in wirtschaftsinformatik" in lowered
+
+
+def _normalize_phone_cta(body: str, phone: str) -> str:
+    if not phone:
+        return body
+    body = re.sub(
+        r"(?im)^\s*Rufen Sie mich gerne an unter\s+[+\d\s()/.-]+\.?\s*$",
+        f"Rückmeldung gerne auch per Telefon: {phone}.",
+        body,
+    )
+    body = re.sub(
+        r"(?im)^\s*Rückmeldung gerne auch per Telefon:\s*[+\d\s()/.-]+\.?\s*$",
+        f"Rückmeldung gerne auch per Telefon: {phone}.",
+        body,
+    )
+    return body
+
+
+def _replace_sales_phrases(body: str) -> str:
+    replacements = {
+        "bin beeindruckt von Ihrem Fokus auf digitale Prozesse": "bin auf Ihre öffentlich sichtbaren Verwaltungsthemen aufmerksam geworden",
+        "einen Mehrwert schaffen könnten": "konkret sinnvoll sein könnten",
+        "einen Mehrwert schaffen": "konkret sinnvoll sein",
+        "Ich würde mich freuen, in einem kurzen Austausch kurz zu besprechen, wie": "Wenn das grundsätzlich interessant ist, können wir kurz besprechen, ob",
+        "Ich würde mich freuen, in einem kurzen Austausch zu besprechen, wie": "Wenn das grundsätzlich interessant ist, können wir kurz besprechen, ob",
+        "zu erörtern": "kurz zu besprechen",
+        "Optimierung Ihrer Verwaltungsprozesse": "Kleiner Blick auf wiederkehrende Verwaltungsprozesse",
+    }
+    cleaned = body
+    for old, new in replacements.items():
+        cleaned = cleaned.replace(old, new)
+    cleaned = cleaned.replace(
+        "Ich würde mich freuen, in einem kurzen Austausch kurz zu besprechen, wie",
+        "Wenn das grundsätzlich interessant ist, können wir kurz besprechen, ob",
+    )
     return cleaned
+
+
+def _normalize_mail_spacing(body: str) -> str:
+    cleaned = re.sub(r"([.!?])\n(Rückmeldung gerne auch per Telefon:)", r"\1\n\n\2", body)
+    cleaned = re.sub(r"([.!?])\n(Viele Grüße\nJann Körner)", r"\1\n\n\2", cleaned)
+    return cleaned.strip()
 
 
 def _insert_before_signoff(body: str, sentence: str) -> str:

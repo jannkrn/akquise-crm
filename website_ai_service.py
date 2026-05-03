@@ -5,7 +5,7 @@ import re
 from typing import Any
 from urllib.parse import urlparse
 
-from config import OPENAI_API_KEY, OPENAI_MODEL
+from config import OPENAI_API_KEY, OPENAI_WEBSITE_MODEL
 from crm_service import COMPANY_TYPES, OFFER_ANGLES
 from prompt_store import enforce_sender_prompt_in_email, get_sender_prompt
 
@@ -121,7 +121,11 @@ Mail-Regeln:
 - keine Unterstellung konkreter Probleme
 - Bezug auf öffentlich sichtbare Themen
 - Fokus auf ERP-/Excel-nahe Abläufe, Auswertungen, Datenqualität, kleine Automatisierungen
-- klarer Call-to-Action für kurzen Austausch
+- Struktur der Mail: Anrede, 1 konkreter Website-Bezug, 1 kurzer Profil-Brückensatz, kleines Pilotangebot, kurzer Call-to-Action mit Telefonhinweis, Grußformel
+- Profil nicht als Lebenslauf aufzählen, sondern als Praxisbezug zu ERP-/Excel-nahen Abläufen formulieren
+- schreibe natürlich und nüchtern; vermeide Sales-Floskeln wie "beeindruckt", "Mehrwert schaffen", "Optimierung Ihrer Prozesse", "erörtern"
+- erfinde keine Details wie Buchhaltung, Wirtschaftspläne, konkrete Software oder konkrete Probleme, wenn sie nicht im Website-Text stehen
+- klarer Call-to-Action für kurzen Austausch, ohne Druck
 - konkrete Fakten aus dem Absenderprompt wie Studienort, Rossmann-Rolle und Telefonnummer müssen korrekt übernommen werden
 - die Telefonnummer gehört als kurzer Rückmelde-Hinweis vor die Grußformel, nicht als technische Signatur
 - Signatur exakt:
@@ -138,11 +142,12 @@ Jann Körner
 
     try:
         response = client.chat.completions.create(
-            model=OPENAI_MODEL,
+            model=OPENAI_WEBSITE_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
+            response_format={"type": "json_object"},
             temperature=0.2,
         )
     except Exception as exc:
@@ -173,7 +178,7 @@ Jann Körner
     result = {field: str(parsed.get(field) or "").strip() for field in allowed_fields}
     result["email_body"] = enforce_sender_prompt_in_email(result["email_body"], sender_prompt)
     result["website"] = result["website"] or page["url"]
-    result["email_variant"] = result["email_variant"] or f"OpenAI/Website/{OPENAI_MODEL}"
+    result["email_variant"] = result["email_variant"] or f"OpenAI/Website/{OPENAI_WEBSITE_MODEL}"
     result["status"] = result["status"] or "Entwurf erstellt"
     result["next_step"] = result["next_step"] or "Entwurf prüfen und ggf. Gmail-Draft erstellen."
     return result
