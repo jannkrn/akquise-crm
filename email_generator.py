@@ -4,7 +4,7 @@ import json
 from typing import Any
 
 from config import OPENAI_API_KEY, OPENAI_MODEL
-from prompt_store import get_sender_prompt
+from prompt_store import enforce_sender_prompt_in_email, get_sender_prompt
 
 
 def _clean(value: Any) -> str:
@@ -80,7 +80,7 @@ def generate_template_email(company: dict[str, Any], tone: str = "sachlich") -> 
 
 {opening}
 
-Ich habe in einer Immobilienfirma im Accounting gearbeitet, mache aktuell meinen Master in Wirtschaftsinformatik und arbeite als Werkstudent bei Rossmann im Bereich Prozessautomatisierung sowie Datenanalyse und Data Engineering.
+Ich habe in einer Immobilienfirma im Accounting gearbeitet, mache aktuell meinen Master in Wirtschaftsinformatik in Halle und arbeite als Werkstudent bei Rossmann im Bereich Prozessautomatisierung sowie Datenanalyse und Data Engineering.
 
 {angle_sentence} {pain_sentence}
 
@@ -95,7 +95,7 @@ Jann Körner"""
 
 Ich melde mich, weil ich in solchen ERP- und Excel-nahen Verwaltungsprozessen häufig kleine, aber spürbare Entlastungsmöglichkeiten sehe, ohne dem Unternehmen ein großes Projekt aufzudrücken.
 
-Kurz zu mir: Ich habe Accounting-Erfahrung aus einer Immobilienfirma, mache aktuell meinen Master in Wirtschaftsinformatik und arbeite als Werkstudent bei Rossmann in Prozessautomatisierung sowie Datenanalyse und Data Engineering.
+Kurz zu mir: Ich habe Accounting-Erfahrung aus einer Immobilienfirma, mache aktuell meinen Master in Wirtschaftsinformatik in Halle und arbeite als Werkstudent bei Rossmann in Prozessautomatisierung sowie Datenanalyse und Data Engineering.
 
 {angle_sentence} {pain_sentence}
 
@@ -108,7 +108,7 @@ Jann Körner"""
 
 {opening}
 
-Aus meiner Zeit im Accounting einer Immobilienfirma kenne ich viele manuelle Abläufe rund um ERP, Excel, Abrechnungen und wiederkehrende Abstimmungen. Aktuell mache ich meinen Master in Wirtschaftsinformatik und arbeite als Werkstudent bei Rossmann im Bereich Prozessautomatisierung sowie Datenanalyse und Data Engineering.
+Aus meiner Zeit im Accounting einer Immobilienfirma kenne ich viele manuelle Abläufe rund um ERP, Excel, Abrechnungen und wiederkehrende Abstimmungen. Aktuell mache ich meinen Master in Wirtschaftsinformatik in Halle und arbeite als Werkstudent bei Rossmann im Bereich Prozessautomatisierung sowie Datenanalyse und Data Engineering.
 
 {angle_sentence} {pain_sentence}
 
@@ -121,7 +121,7 @@ Jann Körner"""
 
     return {
         "subject": _subject_for_angle(offer_angle),
-        "body": body,
+        "body": enforce_sender_prompt_in_email(body),
         "variant": f"Template/{tone}/{offer_angle}",
     }
 
@@ -168,6 +168,8 @@ Regeln:
 - Bezug nur auf öffentlich sichtbare Themen aus den Eingaben.
 - Fokus auf ERP-/Excel-nahe Abläufe, Auswertungen, Datenqualität, kleine Automatisierungen.
 - Klarer Call-to-Action für einen kurzen Austausch.
+- Konkrete Fakten aus dem Absenderprompt wie Studienort, Rossmann-Rolle und Telefonnummer müssen korrekt übernommen werden.
+- Die Telefonnummer gehört als kurzer Rückmelde-Hinweis vor die Grußformel, nicht als technische Signatur.
 - Signatur exakt:
 Viele Grüße
 Jann Körner
@@ -202,7 +204,7 @@ Jann Körner
     parsed = json.loads(content)
     return {
         "subject": _clean(parsed.get("subject")),
-        "body": _clean(parsed.get("body")),
+        "body": enforce_sender_prompt_in_email(_clean(parsed.get("body")), sender_prompt),
         "variant": f"OpenAI/{OPENAI_MODEL}/{tone}",
     }
 

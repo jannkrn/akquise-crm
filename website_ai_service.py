@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 from config import OPENAI_API_KEY, OPENAI_MODEL
 from crm_service import COMPANY_TYPES, OFFER_ANGLES
-from prompt_store import get_sender_prompt
+from prompt_store import enforce_sender_prompt_in_email, get_sender_prompt
 
 
 class WebsiteAnalysisError(RuntimeError):
@@ -103,14 +103,7 @@ Du analysierst öffentlich sichtbare Websites von Immobilienunternehmen für ein
 Fülle CRM-Felder so gut wie möglich aus. Erfinde keine Namen, E-Mail-Adressen, Telefonnummern oder konkreten Prozesse.
 Wenn etwas nicht klar aus dem Website-Text hervorgeht, lasse das Feld leer oder formuliere es vorsichtig als Hypothese.
 
-Zielangebot von Jann Körner:
-- Accounting-Erfahrung in einer Immobilienfirma
-- Master in Wirtschaftsinformatik
-- Werkstudent bei Rossmann in Prozessautomatisierung sowie Datenanalyse/Data Engineering
-- Kleine Pilotprojekte: 1-2 wiederkehrende Prozesse prüfen und ggf. vereinfachen
-- Keine große Beratung, keine automatisierten Mailversprechen
-
-Nutze immer diesen bearbeitbaren Absenderprompt:
+Der folgende bearbeitbare Absenderprompt ist die verbindliche Quelle für Profil, Positionierung, Tonalität und Kontaktangaben:
 {sender_prompt}
 
 Erlaubte company_type-Werte: {", ".join(COMPANY_TYPES)}
@@ -129,6 +122,8 @@ Mail-Regeln:
 - Bezug auf öffentlich sichtbare Themen
 - Fokus auf ERP-/Excel-nahe Abläufe, Auswertungen, Datenqualität, kleine Automatisierungen
 - klarer Call-to-Action für kurzen Austausch
+- konkrete Fakten aus dem Absenderprompt wie Studienort, Rossmann-Rolle und Telefonnummer müssen korrekt übernommen werden
+- die Telefonnummer gehört als kurzer Rückmelde-Hinweis vor die Grußformel, nicht als technische Signatur
 - Signatur exakt:
 Viele Grüße
 Jann Körner
@@ -176,6 +171,7 @@ Jann Körner
         "notes",
     }
     result = {field: str(parsed.get(field) or "").strip() for field in allowed_fields}
+    result["email_body"] = enforce_sender_prompt_in_email(result["email_body"], sender_prompt)
     result["website"] = result["website"] or page["url"]
     result["email_variant"] = result["email_variant"] or f"OpenAI/Website/{OPENAI_MODEL}"
     result["status"] = result["status"] or "Entwurf erstellt"
