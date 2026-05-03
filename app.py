@@ -131,6 +131,14 @@ def select_index(options: list[str], current_value: str) -> int:
     return options.index(current_value) if current_value in options else 0
 
 
+def remember_draft(company_id: int, draft: dict[str, str]) -> None:
+    st.session_state[f"draft_{company_id}"] = draft
+    st.session_state[f"subject_{company_id}"] = draft.get("subject", "")
+    st.session_state[f"body_{company_id}"] = draft.get("body", "")
+    st.session_state[f"variant_{company_id}"] = draft.get("variant", "")
+    st.session_state["draft_company_id"] = company_id
+
+
 def form_defaults(company: dict[str, Any] | None = None) -> dict[str, str]:
     company = company or {}
     defaults = {field: str(company.get(field) or "") for field in COMPANY_FIELDS}
@@ -321,11 +329,11 @@ def render_company_form(company: dict[str, Any] | None = None) -> None:
         next_step = st.text_input("Nächster Schritt", value=defaults["next_step"])
         notes = st.text_area("Notizen", value=defaults["notes"], height=100)
         prepare_gmail_draft = st.checkbox(
-            "Nach dem Speichern Gmail-Entwurf vorbereiten",
+            "Nach dem Speichern Gmail-Draft direkt erstellen",
             value=False,
             help=(
-                "Erzeugt nur den Mailtext und merkt das Unternehmen für den Tab Mail-Entwürfe vor. "
-                "Der Gmail-Draft wird erst nach sichtbarer Prüfung per Button erstellt."
+                "Erstellt direkt einen Gmail-Draft mit genau dem Betreff und E-Mail-Text aus diesem Formular. "
+                "Es wird nichts automatisch versendet."
             ),
         )
 
@@ -368,8 +376,12 @@ def render_company_form(company: dict[str, Any] | None = None) -> None:
                 st.session_state["company_form_version"] = form_version + 1
 
             if prepare_gmail_draft:
-                saved_company = get_company(saved_id) or payload
-                draft = generate_initial_email(saved_company, tone="sachlich", use_openai=False)
+                draft = {
+                    "subject": email_subject.strip(),
+                    "body": email_body.strip(),
+                    "variant": email_variant.strip() or "Formular",
+                }
+
                 update_company(
                     saved_id,
                     {
@@ -379,9 +391,35 @@ def render_company_form(company: dict[str, Any] | None = None) -> None:
                         "status": "Entwurf erstellt",
                     },
                 )
-                st.session_state[f"draft_{saved_id}"] = draft
-                st.session_state["draft_company_id"] = saved_id
-                message += " Mail-Entwurf wurde vorbereitet und ist im Tab Mail-Entwürfe vorausgewählt."
+                remember_draft(saved_id, draft)
+                message += " Mail-Entwurf wurde gespeichert und ist im Tab Mail-Entwürfe vorausgewählt."
+
+                if not draft["subject"] or not draft["body"]:
+                    st.session_state["flash_warning"] = (
+                        "Unternehmen wurde gespeichert, aber es wurde kein Gmail-Draft erstellt: "
+                        "Betreff und E-Mail-Text müssen ausgefüllt sein."
+                    )
+                else:
+                    try:
+                        gmail_draft = create_gmail_draft(
+                            to=email,
+                            subject=draft["subject"],
+                            body=draft["body"],
+                        )
+                        update_company(
+                            saved_id,
+                            {
+                                "gmail_draft_id": gmail_draft["draft_id"],
+                                "gmail_draft_message_id": gmail_draft["message_id"],
+                                "gmail_draft_thread_id": gmail_draft["thread_id"],
+                            },
+                        )
+                        message += f" Gmail-Draft wurde erstellt. Draft-ID: {gmail_draft['draft_id']}"
+                    except GmailDraftError as exc:
+                        st.session_state["flash_warning"] = (
+                            "Unternehmen und Mailtext wurden gespeichert, aber der Gmail-Draft konnte nicht erstellt werden: "
+                            f"{exc}"
+                        )
 
             st.session_state["flash_success"] = message
             st.rerun()
@@ -526,10 +564,13 @@ def render_email_drafts() -> None:
             "pain_point_hypothesis": pain_point_hypothesis,
             "offer_angle": offer_angle,
         }
-        st.session_state[f"draft_{selected_id}"] = generate_initial_email(
-            draft_company,
-            tone=tone,
-            use_openai=use_openai,
+        remember_draft(
+            selected_id,
+            generate_initial_email(
+                draft_company,
+                tone=tone,
+                use_openai=use_openai,
+            ),
         )
 
     draft = st.session_state.get(
@@ -844,6 +885,8 @@ def main() -> None:
     st.caption("Lokale Verwaltung von Leads, Mailentwürfen und Follow-ups.")
     if st.session_state.get("flash_success"):
         st.success(st.session_state.pop("flash_success"))
+    if st.session_state.get("flash_warning"):
+        st.warning(st.session_state.pop("flash_warning"))
 
     tabs = st.tabs(
         [
